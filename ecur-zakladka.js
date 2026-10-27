@@ -583,8 +583,8 @@ window.XLSX=XLSX;
     } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
 
-  function download(name, bytes) {
-    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+  function download(name, bytes, type) {
+    const blob = new Blob([bytes], { type: type || 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -667,7 +667,8 @@ window.XLSX=XLSX;
       <div class="row"><button class="big" id="go" disabled>\u0421\u0434\u0435\u043b\u0430\u0442\u044c \u043f\u0440\u0435\u0437\u0435\u043d\u0442\u0430\u0446\u0438\u0438</button><span class="muted" id="goHint">\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0432\u044b\u0433\u0440\u0443\u0437\u043a\u0443 \u0438 \u043e\u0442\u043c\u0435\u0442\u044c\u0442\u0435 \u043e\u043a\u0440\u0443\u0433\u0430</span></div>
       <div class="progress"><div id="bar"></div></div>
       <div class="log" id="log"></div>
-      <p class="hint">\u0424\u0430\u0439\u043b\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u044e\u0442\u0441\u044f \u0432 \u043f\u0430\u043f\u043a\u0443 \u00ab\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438\u00bb. \u0415\u0441\u043b\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0441\u043f\u0440\u043e\u0441\u0438\u0442 \u00ab\u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044c \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u043d\u0438\u0435 \u043d\u0435\u0441\u043a\u043e\u043b\u044c\u043a\u0438\u0445 \u0444\u0430\u0439\u043b\u043e\u0432\u00bb \u2014 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0420\u0430\u0437\u0440\u0435\u0448\u0438\u0442\u044c\u00bb.</p>
+      <div class="row" id="files" style="margin-top:10px"></div>
+      <p class="hint">\u0415\u0441\u043b\u0438 \u0432\u044b\u0431\u0440\u0430\u043d\u043e \u043d\u0435\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u043e\u043a\u0440\u0443\u0433\u043e\u0432, \u0441\u043a\u0430\u0447\u0430\u0435\u0442\u0441\u044f \u043e\u0434\u0438\u043d ZIP-\u0430\u0440\u0445\u0438\u0432 \u0441\u043e \u0432\u0441\u0435\u043c\u0438 \u043f\u0440\u0435\u0437\u0435\u043d\u0442\u0430\u0446\u0438\u044f\u043c\u0438. \u041e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0435 \u0444\u0430\u0439\u043b\u044b \u2014 \u043a\u043d\u043e\u043f\u043a\u0430\u043c\u0438 \u043f\u043e\u0434 \u043b\u043e\u0433\u043e\u043c.</p>
     </section>
   </div>
 </div></div>`;
@@ -683,6 +684,14 @@ window.XLSX=XLSX;
     d.textContent = msg;
     el.appendChild(d);
     el.scrollTop = el.scrollHeight;
+  }
+  function addFileButton(name, bytes) {
+    const b = document.createElement('button');
+    b.className = 'sec';
+    b.textContent = '\u2b07 ' + name.replace(/^\u0415\u0426\u0423\u0420_/, '').replace(/_\u0430\u043d\u0430\u043b\u0438\u0437_\u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043a.*$/, '');
+    b.title = name;
+    b.onclick = () => download(name, bytes);
+    $('files').appendChild(b);
   }
   const setBar = (p) => { $('bar').style.width = Math.max(0, Math.min(100, p)) + '%'; };
 
@@ -816,7 +825,9 @@ window.XLSX=XLSX;
       log('\u0414\u043e\u0441\u0442\u0443\u043f \u0435\u0441\u0442\u044c.', 'ok');
     }
     state.busy = true; updateGo();
-    let done = 0, saved = 0;
+    let done = 0;
+    const files = [];
+    $('files').innerHTML = '';
     for (const o of chosen) {
       try {
         log(`\n\u25b6 ${o.name}`);
@@ -834,9 +845,9 @@ window.XLSX=XLSX;
         const pres = Slides.buildDeck(PptxGenJS, d, categories, { photosPerCard: opts.photosPerCard, dateLabel: state.dateLabel });
         const bytes = await pres.write({ outputType: 'uint8array', compression: true });
         const fname = `\u0415\u0426\u0423\u0420_${meta.file}_\u0430\u043d\u0430\u043b\u0438\u0437_\u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043a${state.dateLabel ? '_' + state.dateLabel : ''}.pptx`;
-        download(fname, bytes);
-        saved++;
-        log(`\u2714 \u0421\u043a\u0430\u0447\u0430\u043d\u043e: ${fname}`, 'ok');
+        files.push({ name: fname, bytes });
+        addFileButton(fname, bytes);
+        log(`\u2714 \u0413\u043e\u0442\u043e\u0432\u0430: ${fname}`, 'ok');
       } catch (e) {
         log(`\u2716 ${o.name}: ${e && e.message ? e.message : e}`, 'e');
       }
@@ -844,7 +855,18 @@ window.XLSX=XLSX;
       setBar((done / chosen.length) * 100);
     }
     state.busy = false; updateGo();
-    log(`\n\u0413\u043e\u0442\u043e\u0432\u043e: ${saved} \u0438\u0437 ${chosen.length}. \u0424\u0430\u0439\u043b\u044b \u2014 \u0432 \u043f\u0430\u043f\u043a\u0435 \u00ab\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438\u00bb.`, saved === chosen.length ? 'ok' : 'w');
+    // \u041e\u0434\u043d\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0430: \u0431\u0440\u0430\u0443\u0437\u0435\u0440 \u0431\u043b\u043e\u043a\u0438\u0440\u0443\u0435\u0442 \u0441\u0435\u0440\u0438\u044e \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u043d\u0438\u0439 \u043f\u043e\u0434\u0440\u044f\u0434
+    if (files.length === 1) {
+      download(files[0].name, files[0].bytes);
+    } else if (files.length > 1) {
+      const zip = new JSZip();
+      files.forEach((f) => zip.file(f.name, f.bytes));
+      const zbytes = await zip.generateAsync({ type: 'uint8array' });
+      const zname = `\u0415\u0426\u0423\u0420_\u043f\u0440\u0435\u0437\u0435\u043d\u0442\u0430\u0446\u0438\u0438${state.dateLabel ? '_' + state.dateLabel : ''}.zip`;
+      download(zname, zbytes, 'application/zip');
+      log(`\u0412\u0441\u0435 \u043f\u0440\u0435\u0437\u0435\u043d\u0442\u0430\u0446\u0438\u0438 \u043e\u0434\u043d\u0438\u043c \u0430\u0440\u0445\u0438\u0432\u043e\u043c: ${zname}`, 'ok');
+    }
+    log(`\n\u0413\u043e\u0442\u043e\u0432\u043e: ${files.length} \u0438\u0437 ${chosen.length}. \u0424\u0430\u0439\u043b \u2014 \u0432 \u043f\u0430\u043f\u043a\u0435 \u00ab\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0438\u00bb. \u041a\u0430\u0436\u0434\u0443\u044e \u043f\u0440\u0435\u0437\u0435\u043d\u0442\u0430\u0446\u0438\u044e \u043c\u043e\u0436\u043d\u043e \u0441\u043a\u0430\u0447\u0430\u0442\u044c \u0438 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e \u043a\u043d\u043e\u043f\u043a\u0430\u043c\u0438 \u043d\u0438\u0436\u0435.`, files.length === chosen.length ? 'ok' : 'w');
   };
   updateGo();
 })();
